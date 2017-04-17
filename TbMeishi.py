@@ -7,15 +7,17 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-
-from example.config_taobao import * #声明配置文件
-
+import requests
+MONGO_URL = 'localhost'
+MONGO_DB = 'taobao'
+MONGO_TABLE = 'product'
+KEYWORD = '美食'
 #开启MongoDB
 client = pymongo.MongoClient(MONGO_URL)
 db=client[MONGO_DB]
+SERVICE_ARGS = ['--load-images=false','--disk-cache=true']#不加载图片,开启缓存
 
-browser = webdriver.PhantomJS(service_args=SERVICE_ARGS)#配置写在配置文件中了,
-#下面这一行selenium可以用来提交表单，判断当前页（即高亮的页）是否是所要的页
+browser = webdriver.PhantomJS(service_args=SERVICE_ARGS)#配置写在配置文件中了
 wait = WebDriverWait(browser, 10)#下面要多次用到，先存一下，10表示等待时间
 
 browser.set_window_size(1400 ,900)#设置一下窗口大小，如果太小会影响效果
@@ -68,14 +70,15 @@ def get_products():#获取商品的信息
             'location' : item.find('.location').text()
         }
         print(product)
-        save_to_mongo(product)
-
+        #save_to_mongo(product)
+'''
 def save_to_mongo(result):
     try:
         if db[MONGO_TABLE].insert(result):
             print('存储到MONGODB成功',result)
     except Exception:
         print('存储到MONGODB失败', result)
+'''
 def main():
     try:
         total = search()
