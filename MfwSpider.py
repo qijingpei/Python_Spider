@@ -1,45 +1,47 @@
 '''
-目标：爬取蚂蜂窝
+目标：爬取蚂蜂窝所有攻略的出发时间
 获取热门城市 -> 获取城市下的游记列表 -> 获取游记内容 -> 提取游记内容的游记标题、城市、出发时间等，
 接下来我们用三个步骤来实现它。。。
+备注：先处理了一些静态显示的出发时间，js封装的出发时间还没能够解析
 '''
 import re
 import requests
-from pyquery import PyQuery as pq#用一个简单的名字
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from Travel.config import *
-import time
-from requests.exceptions import RequestException
 from multiprocessing import Pool#multi processing
 
-
+'''
 browser = webdriver.PhantomJS(service_args=SERVICE_ARGS)#PhantomJS可以模拟浏览器，而且不用弹出浏览器
 wait = WebDriverWait(browser, 10)
 browser.set_window_size(1400, 900)#设置一下窗口大小，如果太小会影响效果
-
+'''
 def get_one_page(url):#获得一个页面的html代码
     try:
         response = requests.get(url)
         if response.status_code == 200:
              return response.text
         return None
-    except RequestException:
+    except Exception:
         return None
 
 def get_total_city_pages():#获取城市列表总页数，成功
     print('获取城市列表总页数')
     #用phantomJS来写的，其实用requests来写也一样！~
     try:
+        response = requests.get('http://www.mafengwo.cn/mdd/citylist/21536.html')
+        html = response.text
+        #print(html)
+        pattern = re.compile(r'count">共(.*?)页</span>')
+        total = re.search(pattern, html).group(1)#获取总页数
+        #print('总页数：'+total)
+        return int(total)
+        '''
         browser.get('http://www.mafengwo.cn/mdd/citylist/21536.html')
         total = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR,'#citylistpagination > div > span.count'))#等到总页数出现
         )
         return total.text
-    except TimeoutException:
+        '''
+    except Exception:
+        print('获取城市列表总页数出错，正在重新获取')
         return get_total_city_pages()#递归，until there is result to return
 
 def get_cities_info(page_number):#通过在url中输入页数，跳转到其他页面
@@ -75,14 +77,14 @@ def get_strategy_total_page(url):#获取一个城市的所有攻略的总页数
     pattern = re.compile(r'class="count">共<span>(.*?)</span>页')
     total = re.search(pattern, html)
     if total :
-        print('攻略总页数：'+total.group(1))#获取攻略总页数，这里的“.group(1)”会从中提取出页数（其实我也不明白是怎么提取出来的）
+        print('攻略总页数：'+total.group(1))#获取攻略总页数，这里的“.group(1)”会从中提取出页数
         return total.group(1)
     return get_strategy_total_page(url)
 
 def get_city_strategies(url):#获取一个城市的所有攻略
     total = int(get_strategy_total_page(url))#总页数
     index = re.search(r'mafengwo/(\d*?).html', url)  # 获取一个城市的标识
-    #print('index:' + index.group(1))
+    # ('index:' + index.group(1))
     # 凑出攻略列表界面的类型：http://www.mafengwo.cn/yj/10189/1-0-1.html'，10189是城市标识，1-0-1中最后1个1是攻略列表页面的标识，通过修改他们俩获得所有攻略
     for i in range(1, 2):#左闭右开
         str_list_url = 'http://www.mafengwo.cn/yj/' + index.group(1) + '/1-0-'+str(i)+'.html'  # 攻略strategy列表的url
@@ -104,7 +106,7 @@ def parse_strategies_list(url):#--------解析出每个攻略列表页面的多�
     if items:
         for item in items:
             item = 'http://www.mafengwo.cn' + item
-            print(item)
+            #print(item)
             parse_one_strategy(item)#解析这个攻略的url
 
 def parse_one_strategy(url):#对每一个攻略的url进行解析，得到出发时间等信息，存到数据库中：
@@ -130,12 +132,19 @@ def parse_one_strategy(url):#对每一个攻略的url进行解析，得到出发
         return
 
 def main():
+    total = get_total_city_pages() #获取城市总页数
+    print(total)
+    pool = Pool()
+    pool.map(get_cities_info, [1])  # Apply `func` to each element in `iterable`(即第二个参数),
     #try:
+    '''
     total = get_total_city_pages()
     total = int(re.compile('(\d+)').search(total).group(1))##从“共400页”中获取总页数，强转成int型
     print(total)
     pool = Pool()
     pool.map(get_cities_info, [1])#Apply `func` to each element in `iterable`(即第二个参数),
+    '''
+
     #————————注意每个城市现在只爬取了1页！！！————————
     # (1页有9个城市，9页*15个攻略耗费时间：625.2638635008296=10min) (没有获取到的有45个，获取到的有90个)
     #get_cities_info(1)
@@ -149,10 +158,10 @@ def main():
     '''
 
 if __name__ == '__main__':
-    start = time.clock()
+    #start = time.clock()
     main()
-    end = time.clock()
-    print('耗费时间：'+str(end-start))#4.249068744382217s
+    #end = time.clock()
+    #print('耗费时间：'+str(end-start))#4.249068744382217s
 
 
 
